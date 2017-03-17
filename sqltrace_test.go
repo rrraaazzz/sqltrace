@@ -379,9 +379,6 @@ func TestQueryExec(t *testing.T) {
 		queryExecError := fmt.Errorf("query exec error")
 		rowError := fmt.Errorf("row error")
 
-		arg1 := expectedArg{"arg1", 1, 13}
-		arg2 := expectedArg{"arg2", 2, "arg"}
-
 		qeHasSpan := *queryExecHaveCtx || (*useStmt && *stmtHasCtx) || (*useTx && *txHasCtx)
 
 		// If the driver we are wrapping only exposes the minimal required
@@ -394,7 +391,7 @@ func TestQueryExec(t *testing.T) {
 			expectedInternalStmt = e.prepare(qeHasSpan, "q")
 		}
 
-		queryExpectation := e.query(qeHasSpan, "q").args(arg1, arg2)
+		queryExpectation := e.query(qeHasSpan, "q")
 		if *queryExecHaveErr {
 			queryExpectation.err(queryExecError)
 		} else {
@@ -450,7 +447,7 @@ func TestQueryExec(t *testing.T) {
 			expectedInternalStmt = e.prepare(qeHasSpan, "q")
 		}
 
-		execExpectation := e.exec(qeHasSpan, "q").args(arg1, arg2)
+		execExpectation := e.exec(qeHasSpan, "q")
 		if *queryExecHaveErr {
 			execExpectation.err(queryExecError)
 		} else {
@@ -543,9 +540,8 @@ func TestDeprecated(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, stmt)
 
-	arg := expectedArg{name: "n", index: 0, value: 10}
 	erows := e.rows(false, "col").row(1).row(2)
-	e.query(false, "sql").args(arg).rows(erows)
+	e.query(false, "sql").rows(erows)
 	erows.close(nil)
 
 	rows, err := stmt.Query([]driver.Value{int64(10)})
@@ -562,7 +558,7 @@ func TestDeprecated(t *testing.T) {
 	require.NotNil(t, rows.Next(drvValues))
 	require.Nil(t, rows.Close())
 
-	e.exec(false, "sql").args(arg).result(11, 12, nil)
+	e.exec(false, "sql").result(11, 12, nil)
 	result, err := stmt.Exec([]driver.Value{int64(10)})
 	require.Nil(t, err)
 	require.NotNil(t, result)
@@ -581,7 +577,7 @@ func TestDeprecated(t *testing.T) {
 	tx.Commit()
 
 	erows = e.rows(false, "col")
-	e.query(false, "sql").args(arg).rows(erows)
+	e.query(false, "sql").rows(erows)
 	erows.close(nil)
 
 	rows, err = conn.(driver.Queryer).Query("sql", []driver.Value{int64(10)})
@@ -592,7 +588,7 @@ func TestDeprecated(t *testing.T) {
 	require.NotNil(t, rows.Next(drvValues))
 	require.Nil(t, rows.Close())
 
-	e.exec(false, "sql").args(arg).result(13, 14, nil)
+	e.exec(false, "sql").result(13, 14, nil)
 	result, err = conn.(driver.Execer).Exec("sql", []driver.Value{int64(10)})
 	require.Nil(t, err)
 	require.NotNil(t, result)

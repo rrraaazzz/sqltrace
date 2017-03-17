@@ -19,12 +19,6 @@ import (
 	sqlmock "gopkg.in/DATA-DOG/go-sqlmock.v1"
 )
 
-type expectedArg struct {
-	name  string
-	index int
-	value interface{}
-}
-
 type expectedResult struct {
 	lastInsertId int64
 	rowsAffected int64
@@ -34,7 +28,6 @@ type expectedResult struct {
 type expectedSpan struct {
 	name     string
 	sql      string
-	args     []expectedArg
 	result   *expectedResult
 	hasError bool
 }
@@ -44,14 +37,6 @@ func (e *expectedSpan) setSql(s string) *expectedSpan {
 		return nil
 	}
 	e.sql = s
-	return e
-}
-
-func (e *expectedSpan) setArgs(args ...expectedArg) *expectedSpan {
-	if e == nil {
-		return nil
-	}
-	e.args = args
 	return e
 }
 
@@ -80,28 +65,6 @@ func getSpanSql(s *otmock.MockSpan) string {
 		}
 	}
 	return ""
-}
-
-func spanHasArg(s *otmock.MockSpan, arg expectedArg) bool {
-	for _, log := range s.Logs() {
-		// name field is optional, so it's ok by default
-		indexOk, valueOk, nameOk := false, false, true
-		for _, field := range log.Fields {
-			if field.Key == "argumentOrdinal" {
-				indexOk = field.ValueString == fmt.Sprintf("%v", arg.index)
-			}
-			if field.Key == "argumentValue" {
-				valueOk = field.ValueString == fmt.Sprintf("%v", arg.value)
-			}
-			if field.Key == "argumentName" {
-				nameOk = field.ValueString == arg.name
-			}
-		}
-		if indexOk && valueOk && nameOk {
-			return true
-		}
-	}
-	return false
 }
 
 type expectations struct {
@@ -246,16 +209,6 @@ func (e *expectedQuery) err(queryError error) *expectedQuery {
 	return e
 }
 
-func (e *expectedQuery) args(args ...expectedArg) *expectedQuery {
-	values := make([]driver.Value, len(args))
-	for i, arg := range args {
-		values[i] = arg.value
-	}
-	e.mock.WithArgs(values...)
-	e.span.setArgs(args...)
-	return e
-}
-
 func (e *expectedQuery) rows(r *expectedRows) *expectedQuery {
 	e.mock.WillReturnRows(r.mock)
 	return e
@@ -270,16 +223,6 @@ func (e *expectations) exec(withSpan bool, sql string) *expectedExec {
 func (e *expectedExec) err(execError error) *expectedExec {
 	e.mock.WillReturnError(execError)
 	e.span.setErr()
-	return e
-}
-
-func (e *expectedExec) args(args ...expectedArg) *expectedExec {
-	values := make([]driver.Value, len(args))
-	for i, arg := range args {
-		values[i] = arg.value
-	}
-	e.mock.WithArgs(values...)
-	e.span.setArgs(args...)
 	return e
 }
 
@@ -394,14 +337,6 @@ func (e *expectations) check(t *testing.T, spans []*otmock.MockSpan) {
 		s := getSpanSql(span)
 		if se.sql != "" && se.sql != s {
 			errors = append(errors, "sql")
-		}
-
-		// check args
-		for _, arg := range se.args {
-			if !spanHasArg(span, arg) {
-				errors = append(errors, "args")
-				break
-			}
 		}
 
 		// check result

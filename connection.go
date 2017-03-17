@@ -146,7 +146,7 @@ func (c *conn) Exec(sql string, args []driver.Value) (driver.Result, error) {
 	defer span.end()
 
 	result, err := execer.Exec(sql, args)
-	span.setSql(sql).setArgs(args).setResult(result).setError(err)
+	span.setSql(sql).setResult(result).setError(err)
 
 	return result, err
 }
@@ -166,7 +166,7 @@ func (c *conn) ExecContext(ctx context.Context, sql string, args []driver.NamedV
 	defer span.end()
 
 	result, err := execer.ExecContext(ctx, sql, args)
-	span.setSql(sql).setNamedArgs(args).setResult(result).setError(err)
+	span.setSql(sql).setResult(result).setError(err)
 
 	return result, err
 }
@@ -201,7 +201,7 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 	defer span.end()
 
 	rows, err := queryer.Query(query, args)
-	span.setSql(query).setArgs(args).setError(err)
+	span.setSql(query).setError(err)
 
 	return wrapRows(rows, parentSpan), err
 }
@@ -222,7 +222,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	defer span.end()
 
 	rows, err := qc.QueryContext(ctx, query, args)
-	span.setSql(query).setNamedArgs(args).setError(err)
+	span.setSql(query).setError(err)
 
 	return wrapRows(rows, parentSpan), err
 }

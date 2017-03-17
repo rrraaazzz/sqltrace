@@ -39,7 +39,7 @@ func (s stmt) Exec(args []driver.Value) (driver.Result, error) {
 	defer span.end()
 
 	result, err := s.wrapped.Exec(args)
-	span.setSql(s.sql).setArgs(args).setResult(result).setError(err)
+	span.setSql(s.sql).setResult(result).setError(err)
 
 	return result, err
 }
@@ -49,7 +49,7 @@ func (s stmt) Query(args []driver.Value) (driver.Rows, error) {
 	defer span.end()
 
 	rows, err := s.wrapped.Query(args)
-	span.setSql(s.sql).setArgs(args).setError(err)
+	span.setSql(s.sql).setError(err)
 	return wrapRows(rows, s.span), err
 }
 
@@ -78,7 +78,7 @@ func (s stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver
 		}
 	}
 
-	span.setSql(s.sql).setNamedArgs(args).setResult(result).setError(err)
+	span.setSql(s.sql).setResult(result).setError(err)
 	return result, err
 }
 
@@ -108,7 +108,7 @@ func (s stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (drive
 		}
 	}
 
-	span.setSql(s.sql).setNamedArgs(args).setError(err)
+	span.setSql(s.sql).setError(err)
 	return wrapRows(rows, parentSpan), err
 }
 

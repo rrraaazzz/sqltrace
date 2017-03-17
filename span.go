@@ -54,35 +54,6 @@ func (s sqlspan) setSql(sql string) sqlspan {
 	return s
 }
 
-func (s sqlspan) setArgs(args []driver.Value) sqlspan {
-	if s.isEmpty() {
-		return s
-	}
-	for index, arg := range args {
-		// Named arguments start at 1. Keep that convention.
-		s.span.LogFields(otlog.Int("argumentOrdinal", index+1),
-			otlog.Object("argumentValue", arg))
-	}
-	return s
-}
-
-func (s sqlspan) setNamedArgs(args []driver.NamedValue) sqlspan {
-	if s.isEmpty() {
-		return s
-	}
-	for _, arg := range args {
-		fields := []otlog.Field{
-			otlog.Int("argumentOrdinal", arg.Ordinal),
-			otlog.Object("argumentValue", arg.Value),
-		}
-		if arg.Name != "" {
-			fields = append(fields, otlog.String("argumentName", arg.Name))
-		}
-		s.span.LogFields(fields...)
-	}
-	return s
-}
-
 func (s sqlspan) setError(err error) sqlspan {
 	if s.isEmpty() || err == nil {
 		return s
