@@ -512,7 +512,7 @@ func TestPing(t *testing.T) {
 			require.Equal(t, 0, len(spans))
 		} else {
 			require.Equal(t, 1, len(spans))
-			assert.Equal(t, "Ping", spans[0].OperationName)
+			assert.Equal(t, "ping", spans[0].OperationName)
 		}
 	}
 }

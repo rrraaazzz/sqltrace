@@ -10,7 +10,6 @@ package sqltrace
 
 import (
 	"database/sql/driver"
-	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -22,7 +21,6 @@ import (
 type expectedResult struct {
 	lastInsertId int64
 	rowsAffected int64
-	resultError  error
 }
 
 type expectedSpan struct {
@@ -40,11 +38,11 @@ func (e *expectedSpan) setSql(s string) *expectedSpan {
 	return e
 }
 
-func (e *expectedSpan) setResult(lastInsertId, rowsAffected int64, resultError error) *expectedSpan {
+func (e *expectedSpan) setResult(lastInsertId, rowsAffected int64) *expectedSpan {
 	if e == nil {
 		return nil
 	}
-	e.result = &expectedResult{lastInsertId, rowsAffected, resultError}
+	e.result = &expectedResult{lastInsertId, rowsAffected}
 	return e
 }
 
@@ -57,12 +55,9 @@ func (e *expectedSpan) setErr() *expectedSpan {
 }
 
 func getSpanSql(s *otmock.MockSpan) string {
-	for _, log := range s.Logs() {
-		for _, field := range log.Fields {
-			if field.Key == "sql" {
-				return field.ValueString
-			}
-		}
+	value := s.Tag("db.statement")
+	if str, ok := value.(string); ok {
+		return str
 	}
 	return ""
 }
@@ -129,7 +124,7 @@ func (e *expectations) addSpan(forRealz bool, name string) *expectedSpan {
 func (e *expectations) begin(withSpan bool) *expectedBegin {
 	return &expectedBegin{
 		mock: e.mock.ExpectBegin(),
-		span: e.addSpan(withSpan, "BeginTransaction")}
+		span: e.addSpan(withSpan, "begin_transaction")}
 }
 
 func (e *expectedBegin) err(beginError error) *expectedBegin {
@@ -141,7 +136,7 @@ func (e *expectedBegin) err(beginError error) *expectedBegin {
 func (e *expectations) commit(withSpan bool) *expectedCommit {
 	return &expectedCommit{
 		mock: e.mock.ExpectCommit(),
-		span: e.addSpan(withSpan, "Commit")}
+		span: e.addSpan(withSpan, "commit")}
 }
 
 func (e *expectedCommit) err(commitError error) *expectedCommit {
@@ -153,7 +148,7 @@ func (e *expectedCommit) err(commitError error) *expectedCommit {
 func (e *expectations) rollback(withSpan bool) *expectedRollback {
 	return &expectedRollback{
 		mock: e.mock.ExpectRollback(),
-		span: e.addSpan(withSpan, "Rollback")}
+		span: e.addSpan(withSpan, "rollback")}
 }
 
 func (e *expectedRollback) err(rollbackError error) *expectedRollback {
@@ -167,7 +162,7 @@ func (e *expectations) prepare(withSpan bool, sql string) *expectedPrepare {
 		e:    e,
 		sql:  sql,
 		mock: e.mock.ExpectPrepare(sql),
-		span: e.addSpan(withSpan, "PrepareStatement").setSql(sql)}
+		span: e.addSpan(withSpan, "prepare_statement").setSql(sql)}
 }
 
 func (e *expectedPrepare) err(prepareError error) *expectedPrepare {
@@ -179,17 +174,17 @@ func (e *expectedPrepare) err(prepareError error) *expectedPrepare {
 func (e *expectedPrepare) query() *expectedQuery {
 	return &expectedQuery{
 		mock: e.mock.ExpectQuery(),
-		span: e.e.addSpan(e.span != nil, "Query").setSql(e.sql)}
+		span: e.e.addSpan(e.span != nil, "query").setSql(e.sql)}
 }
 
 func (e *expectedPrepare) exec() *expectedExec {
 	return &expectedExec{
 		mock: e.mock.ExpectExec(),
-		span: e.e.addSpan(e.span != nil, "Exec").setSql(e.sql)}
+		span: e.e.addSpan(e.span != nil, "exec").setSql(e.sql)}
 }
 
 func (e *expectedPrepare) close(err error) *expectedPrepare {
-	closeSpan := e.e.addSpan(e.span != nil, "CloseStatement").setSql(e.sql)
+	closeSpan := e.e.addSpan(e.span != nil, "close_statement").setSql(e.sql)
 	if err != nil {
 		e.mock.WillReturnCloseError(err)
 		closeSpan.setErr()
@@ -200,7 +195,7 @@ func (e *expectedPrepare) close(err error) *expectedPrepare {
 func (e *expectations) query(withSpan bool, query string) *expectedQuery {
 	return &expectedQuery{
 		mock: e.mock.ExpectQuery(query),
-		span: e.addSpan(withSpan, "Query").setSql(query)}
+		span: e.addSpan(withSpan, "query").setSql(query)}
 }
 
 func (e *expectedQuery) err(queryError error) *expectedQuery {
@@ -217,7 +212,7 @@ func (e *expectedQuery) rows(r *expectedRows) *expectedQuery {
 func (e *expectations) exec(withSpan bool, sql string) *expectedExec {
 	return &expectedExec{
 		mock: e.mock.ExpectExec(sql),
-		span: e.addSpan(withSpan, "Exec").setSql(sql)}
+		span: e.addSpan(withSpan, "exec").setSql(sql)}
 }
 
 func (e *expectedExec) err(execError error) *expectedExec {
@@ -229,12 +224,12 @@ func (e *expectedExec) err(execError error) *expectedExec {
 func (e *expectedExec) result(lastInsertId, rowsAffected int64, resultErr error) *expectedExec {
 	var result driver.Result
 	if resultErr == nil {
+		e.span.setResult(lastInsertId, rowsAffected)
 		result = sqlmock.NewResult(lastInsertId, rowsAffected)
 	} else {
 		result = sqlmock.NewErrorResult(resultErr)
 	}
 	e.mock.WillReturnResult(result)
-	e.span.setResult(lastInsertId, rowsAffected, resultErr)
 	return e
 }
 
@@ -250,7 +245,7 @@ func (e *expectations) rows(withSpan bool, columns ...string) *expectedRows {
 func (e *expectedRows) row(values ...driver.Value) *expectedRows {
 	e.mock.AddRow(values...)
 	e.rowCount++
-	e.spans = append(e.spans, e.e.addSpan(e.useSpans, "NextRow"))
+	e.spans = append(e.spans, e.e.addSpan(e.useSpans, "next_row"))
 	return e
 }
 
@@ -258,12 +253,12 @@ func (e *expectedRows) rowError(re error, values ...driver.Value) *expectedRows 
 	e.mock.AddRow(values...)
 	e.mock.RowError(e.rowCount, re)
 	e.rowCount++
-	e.spans = append(e.spans, e.e.addSpan(e.useSpans, "NextRow").setErr())
+	e.spans = append(e.spans, e.e.addSpan(e.useSpans, "next_row").setErr())
 	return e
 }
 
 func (e *expectedRows) close(err error) *expectedRows {
-	closeSpan := e.e.addSpan(e.useSpans, "CloseRows")
+	closeSpan := e.e.addSpan(e.useSpans, "close_rows")
 	if err != nil {
 		e.mock.CloseError(err)
 		closeSpan.setErr()
@@ -272,34 +267,21 @@ func (e *expectedRows) close(err error) *expectedRows {
 }
 
 func spanHasResult(s *otmock.MockSpan, res *expectedResult) bool {
-	for _, log := range s.Logs() {
-		idOk, rowsOk := false, false
-		for _, field := range log.Fields {
-			if res.resultError == nil {
-				if field.Key == "lastInsertId" {
-					idOk = field.ValueString == fmt.Sprintf("%v", res.lastInsertId)
-				}
-				if field.Key == "rowsAffected" {
-					rowsOk = field.ValueString == fmt.Sprintf("%v", res.rowsAffected)
-				}
-			} else {
-				if field.Key == "lastInsertIdError" {
-					idOk = field.ValueString == fmt.Sprintf("%v", res.resultError)
-				}
-				if field.Key == "rowsAffectedError" {
-					rowsOk = field.ValueString == fmt.Sprintf("%v", res.resultError)
-				}
-			}
-		}
-		if idOk && rowsOk {
-			return true
-		}
+	last_insert_id := s.Tag("db.last_insert_id")
+	if value, ok := last_insert_id.(int64); !ok || value != res.lastInsertId {
+		return false
 	}
-	return false
+
+	rows_affected := s.Tag("db.rows_affected")
+	if value, ok := rows_affected.(int64); !ok || value != res.rowsAffected {
+		return false
+	}
+
+	return true
 }
 
 func spanHasError(s *otmock.MockSpan) bool {
-	return s.Tags()["error"] != nil
+	return s.Tag("error") != nil
 }
 
 func (e *expectations) check(t *testing.T, spans []*otmock.MockSpan) {

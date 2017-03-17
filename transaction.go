@@ -19,7 +19,7 @@ func wrapTx(wrapped driver.Tx, c *conn) driver.Tx {
 // Tx interface
 
 func (t tx) Commit() error {
-	span := beginSpan(t.connection.tx_span, "Commit")
+	span := beginSpan(t.connection.tx_span, "commit")
 	defer span.end()
 
 	err := t.wrapped.Commit()
@@ -30,7 +30,7 @@ func (t tx) Commit() error {
 }
 
 func (t tx) Rollback() error {
-	span := beginSpan(t.connection.tx_span, "Rollback")
+	span := beginSpan(t.connection.tx_span, "rollback")
 	defer span.end()
 
 	err := t.wrapped.Rollback()

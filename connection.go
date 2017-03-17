@@ -49,7 +49,7 @@ func newPingerConn(wrapped driver.Conn) driver.Conn {
 // Conn interface
 
 func (c *conn) Prepare(sql string) (driver.Stmt, error) {
-	span := beginSpan(getParentSpan(nil, &c.tx_span), "PrepareStatement")
+	span := beginSpan(getParentSpan(nil, &c.tx_span), "prepare_statement")
 	defer span.end()
 
 	wrappedStmt, err := c.wrapped.Prepare(sql)
@@ -77,7 +77,7 @@ func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, e
 	// gets exclusive use of the connection until commit/rollback.
 	c.tx_span = getParentSpan(ctx, nil)
 
-	span := beginSpan(c.tx_span, "BeginTransaction")
+	span := beginSpan(c.tx_span, "begin_transaction")
 	defer span.end()
 
 	var wrappedTx driver.Tx
@@ -110,7 +110,7 @@ func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, e
 
 func (c *conn) PrepareContext(ctx context.Context, sql string) (driver.Stmt, error) {
 	parentSpan := getParentSpan(ctx, &c.tx_span)
-	span := beginSpan(parentSpan, "PrepareStatement")
+	span := beginSpan(parentSpan, "prepare_statement")
 	defer span.end()
 
 	var wrappedStmt driver.Stmt
@@ -142,7 +142,7 @@ func (c *conn) Exec(sql string, args []driver.Value) (driver.Result, error) {
 		return nil, driver.ErrSkip
 	}
 
-	span := beginSpan(getParentSpan(nil, &c.tx_span), "Exec")
+	span := beginSpan(getParentSpan(nil, &c.tx_span), "exec")
 	defer span.end()
 
 	result, err := execer.Exec(sql, args)
@@ -162,7 +162,7 @@ func (c *conn) ExecContext(ctx context.Context, sql string, args []driver.NamedV
 		return nil, driver.ErrSkip
 	}
 
-	span := beginSpan(getParentSpan(ctx, &c.tx_span), "Exec")
+	span := beginSpan(getParentSpan(ctx, &c.tx_span), "exec")
 	defer span.end()
 
 	result, err := execer.ExecContext(ctx, sql, args)
@@ -177,7 +177,7 @@ func (c *pingerConn) Ping(ctx context.Context) error {
 	// We only use a pingerConn if the wrapped conn implements driver.Pinger
 	pinger := c.wrapped.(driver.Pinger)
 
-	span := beginSpan(getParentSpan(ctx, &c.conn.tx_span), "Ping")
+	span := beginSpan(getParentSpan(ctx, &c.conn.tx_span), "ping")
 	defer span.end()
 
 	err := pinger.Ping(ctx)
@@ -197,7 +197,7 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 	}
 
 	parentSpan := getParentSpan(nil, &c.tx_span)
-	span := beginSpan(parentSpan, "Query")
+	span := beginSpan(parentSpan, "query")
 	defer span.end()
 
 	rows, err := queryer.Query(query, args)
@@ -218,7 +218,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	}
 
 	parentSpan := getParentSpan(ctx, &c.tx_span)
-	span := beginSpan(parentSpan, "Query")
+	span := beginSpan(parentSpan, "query")
 	defer span.end()
 
 	rows, err := qc.QueryContext(ctx, query, args)

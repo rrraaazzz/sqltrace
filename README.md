@@ -64,14 +64,17 @@ func main() {
 
 The spans are created with the following names:
 
-- transactions: BeginTransaction, Commit, Rollback
-- prepared statements: PrepareStatement, CloseStatement 
-- query, exec: Query, Exec
-- rows: NextRow, NextResultSet, CloseRows
+- transactions: begin\_transaction, commit, rollback
+- prepared statements: prepare\_statement, close\_statement
+- query, exec: query, exec
+- rows: next\_row, next\_result\_set, close\_rows
 
-The spans can contain logs with the following keys:
+The spans can contain the following tags
 
-- sql: for prepared statements, query, exec contains the sql string before parameter substitution
-- argumentOrdinal, argumentValue, argumentName: correspond to fields in driver.Value and driver.NamedValue, populated for exec and query calls
-- lastInsertId, lastInsertIdError, rowsAffected, rowsAffectedError: correspond to sql.Result data, populated for exec calls
-- error: for any traced call that fails
+- component: sqltrace
+- db.type: sql
+- span.kind: client
+
+- db.statement: for prepared statements, query, exec contains the sql string before parameter substitution
+- db.last\_insert\_id, db.rows\_affected: correspond to sql.Result data, populated for exec calls
+- error: true, for any traced call that fails

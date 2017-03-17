@@ -35,7 +35,7 @@ func (r rows) Columns() []string {
 }
 
 func (r rows) Close() error {
-	span := beginSpan(r.span, "CloseRows")
+	span := beginSpan(r.span, "close_rows")
 
 	err := r.wrapped.Close()
 	span.setError(err)
@@ -45,7 +45,7 @@ func (r rows) Close() error {
 }
 
 func (r rows) Next(dest []driver.Value) error {
-	span := beginSpan(r.span, "NextRow")
+	span := beginSpan(r.span, "next_row")
 	defer span.end()
 
 	err := r.wrapped.Next(dest)
@@ -61,7 +61,7 @@ func (r rowsNextResultSet) HasNextResultSet() bool {
 }
 
 func (r rowsNextResultSet) NextResultSet() error {
-	span := beginSpan(r.span, "NextResultSet")
+	span := beginSpan(r.span, "next_result_set")
 	defer span.end()
 
 	// Safe to cast since we only wrap it if it implements the interface

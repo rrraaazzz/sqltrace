@@ -32,7 +32,12 @@ func beginSpan(parent sqlspan, name string) sqlspan {
 	if parent.isEmpty() {
 		return sqlspan{nil}
 	}
-	return sqlspan{ot.StartSpan(name, ot.ChildOf(parent.span.Context()))}
+	span := ot.StartSpan(name, ot.ChildOf(parent.span.Context()))
+	// set some standard tags that apply to all our spans
+	otext.Component.Set(span, "sqltrace")
+	otext.SpanKindRPCClient.Set(span)
+	span.SetTag("db.type", "sql")
+	return sqlspan{span}
 }
 
 func (s sqlspan) isEmpty() bool {
@@ -50,7 +55,7 @@ func (s sqlspan) setSql(sql string) sqlspan {
 	if s.isEmpty() || sql == "" {
 		return s
 	}
-	s.span.LogFields(otlog.String("sql", sql))
+	s.span.SetTag("db.statement", sql)
 	return s
 }
 
@@ -59,7 +64,7 @@ func (s sqlspan) setError(err error) sqlspan {
 		return s
 	}
 	s.span.SetTag(string(otext.Error), true)
-	s.span.LogKV(otlog.Error(err))
+	s.span.LogKV(otlog.String("event", "error"), otlog.Error(err))
 	return s
 }
 
@@ -67,29 +72,20 @@ func (s sqlspan) setResult(result driver.Result) sqlspan {
 	if s.isEmpty() || result == nil {
 		return s
 	}
-	fields := make([]otlog.Field, 0, 2)
-
-	// Note that we store a string on errors. The opentracing/log package also
-	// lets us store errors directly, but the otlog.Errors helper doesn't take
-	// a key value, it hardcodes it to "error", which we don't want.
-	//
-	// But, when the log fields actually get serialized, the error simply
-	// turns into a string value by calling err.Error(). So we do this directly.
 
 	lastInsertId, err := result.LastInsertId()
 	if err == nil {
-		fields = append(fields, otlog.Int64("lastInsertId", lastInsertId))
+		s.span.SetTag("db.last_insert_id", lastInsertId)
 	} else {
-		fields = append(fields, otlog.String("lastInsertIdError", err.Error()))
+		s.setError(err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err == nil {
-		fields = append(fields, otlog.Int64("rowsAffected", rowsAffected))
+		s.span.SetTag("db.rows_affected", rowsAffected)
 	} else {
-		fields = append(fields, otlog.String("rowsAffectedError", err.Error()))
+		s.setError(err)
 	}
 
-	s.span.LogFields(fields...)
 	return s
 }
