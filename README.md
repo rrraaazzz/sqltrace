@@ -69,12 +69,11 @@ The spans are created with the following names:
 - query, exec: query, exec
 - rows: next\_row, next\_result\_set, close\_rows
 
-The spans can contain the following tags
+The spans can contain the following tags:
 
 - component: sqltrace
 - db.type: sql
 - span.kind: client
-
 - db.statement: for prepared statements, query, exec contains the sql string before parameter substitution
 - db.last\_insert\_id, db.rows\_affected: correspond to sql.Result data, populated for exec calls
 - error: true, for any traced call that fails
